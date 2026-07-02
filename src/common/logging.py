@@ -13,7 +13,7 @@ from src.common.config import settings
 def configure_logging() -> None:
     logging.basicConfig(
         format="%(message)s",
-        stream=sys.stdout,
+        stream=sys.stderr,
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
     )
     structlog.configure(
