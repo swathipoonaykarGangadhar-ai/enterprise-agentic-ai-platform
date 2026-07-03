@@ -37,8 +37,14 @@ def search_knowledge_base(query: str) -> str:
         The most relevant matching entry, or a message indicating nothing was found.
     """
     logger.info("tool_call", tool="search_knowledge_base", query=query)
-    matches = semantic_search(query, top_k=1)
+    try:
+        matches = semantic_search(query, top_k=1)
+    except Exception as e:
+        logger.error("semantic_search_failed", error=str(e), error_type=type(e).__name__)
+        return f"ERROR searching knowledge base: {e}"
+
     if not matches:
+        logger.warning("no_matches_found", query=query)
         return "No matching entry found in the knowledge base."
     return matches[0]["text"]
 

@@ -16,8 +16,22 @@ spec:
     spec:
       containers:
         - name: platform
-          image: enterprise-agentic-platform:v1
-          imagePullPolicy: Never  # use the local image we just built
+          image: enterprise-agentic-platform:v2
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
           envFrom:
             - secretRef:
                 name: platform-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10

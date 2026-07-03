@@ -73,13 +73,27 @@ async def run_mcp_agent(
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": user_question})
 
-            response = groq_client.chat.completions.create(
-                model=settings.groq_model,
-                messages=messages,
-                tools=tools,
-                tool_choice="auto",
-            )
-            choice = response.choices[0].message
+            choice = None
+            last_error = None
+            for attempt in range(3):
+                try:
+                    response = groq_client.chat.completions.create(
+                        model=settings.groq_model,
+                        messages=messages,
+                        tools=tools,
+                        tool_choice="auto",
+                    )
+                    choice = response.choices[0].message
+                    break
+                except Exception as e:
+                    last_error = e
+                    logger.warning(
+                        "groq_call_failed_retrying",
+                        attempt=attempt + 1,
+                        error=str(e),
+                    )
+            if choice is None:
+                raise last_error
 
             if choice.tool_calls:
                 messages.append(
