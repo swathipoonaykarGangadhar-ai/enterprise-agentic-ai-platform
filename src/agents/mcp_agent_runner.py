@@ -11,6 +11,7 @@ duplicating the tool-discovery / tool-call loop in every agent file.
 from __future__ import annotations
 
 import json
+import os
 
 from groq import Groq
 from mcp import ClientSession, StdioServerParameters
@@ -43,7 +44,7 @@ async def run_mcp_agent(
         The agent's final natural-language answer.
     """
     server_params = StdioServerParameters(
-        command="python", args=["-m", server_module]
+        command="python", args=["-m", server_module], env=os.environ.copy()
     )
 
     async with stdio_client(server_params) as (read, write):
