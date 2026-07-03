@@ -18,6 +18,7 @@ from mcp.client.stdio import stdio_client
 
 from src.common.config import settings
 from src.common.logging import get_logger
+from src.governance.guardrails import GuardrailViolation, check_tool_call
 
 logger = get_logger("agents.mcp_agent_runner")
 
@@ -25,7 +26,10 @@ groq_client = Groq(api_key=settings.groq_api_key)
 
 
 async def run_mcp_agent(
-    server_module: str, user_question: str, system_prompt: str | None = None
+    server_module: str,
+    user_question: str,
+    system_prompt: str | None = None,
+    trace_id: str = "no-trace",
 ) -> str:
     """Run a single question through an MCP-tool-using agent.
 
@@ -104,8 +108,16 @@ async def run_mcp_agent(
                         tool=call.function.name,
                         args=args,
                     )
-                    result = await session.call_tool(call.function.name, args)
-                    result_text = result.content[0].text if result.content else ""
+
+                    try:
+                        check_tool_call(call.function.name, args, trace_id)
+                        result = await session.call_tool(call.function.name, args)
+                        result_text = (
+                            result.content[0].text if result.content else ""
+                        )
+                    except GuardrailViolation as e:
+                        result_text = f"BLOCKED BY GOVERNANCE POLICY: {e}"
+
                     messages.append(
                         {
                             "role": "tool",

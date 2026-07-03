@@ -24,11 +24,12 @@ SYSTEM_PROMPT = (
 )
 
 
-async def run(question: str) -> str:
+async def run(question: str, trace_id: str = "no-trace") -> str:
     return await run_mcp_agent(
         server_module="src.mcp_servers.knowledge_server",
         user_question=question,
         system_prompt=SYSTEM_PROMPT,
+        trace_id=trace_id,
     )
 
 

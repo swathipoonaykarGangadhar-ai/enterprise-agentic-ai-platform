@@ -1,13 +1,9 @@
 """
 Supervisor
 ===========
-The multi-agent orchestrator. Given a user question, it asks Groq to
-classify which specialist agent should handle it, then routes the
-question to that agent and returns its answer.
-
-This is a simple "router" pattern — the most common, production-proven
-starting point for multi-agent orchestration before adding more complex
-patterns (parallel agents, hand-offs, shared memory, etc).
+The multi-agent orchestrator, now with governance built in: every
+request gets a trace ID, every routing decision and final answer is
+recorded to the audit log, and PII is redacted before logging.
 
 Run it directly:
     python -m src.orchestration.supervisor "What's the status of TICKET-101?"
@@ -22,6 +18,8 @@ from groq import Groq
 from src.agents import it_support_agent, knowledge_agent
 from src.common.config import settings
 from src.common.logging import configure_logging, get_logger
+from src.governance.audit import new_trace_id, record_event
+from src.governance.pii import redact_pii
 
 configure_logging()
 logger = get_logger("orchestration.supervisor")
@@ -68,14 +66,44 @@ def _classify(question: str) -> str:
         if name in choice:
             return name
     logger.warning("classification_fallback", raw_response=choice)
-    return "knowledge"  # safe default
+    return "knowledge"
 
 
-async def route(question: str) -> str:
+async def route(question: str, trace_id: str | None = None) -> str:
+    trace_id = trace_id or new_trace_id()
+
+    redacted_question, pii_found = redact_pii(question)
+    if pii_found:
+        logger.warning("pii_detected_in_question", trace_id=trace_id, types=pii_found)
+
     agent_name = _classify(question)
-    logger.info("routing_decision", question=question, routed_to=agent_name)
+    logger.info("routing_decision", question=redacted_question, routed_to=agent_name)
+    record_event(
+        trace_id=trace_id,
+        event_type="routing_decision",
+        agent="supervisor",
+        detail={
+            "question": redacted_question,
+            "routed_to": agent_name,
+            "pii_detected": pii_found,
+        },
+    )
+
     agent_fn = AGENTS[agent_name]["run"]
-    return await agent_fn(question)
+    answer = await agent_fn(question, trace_id=trace_id)
+
+    redacted_answer, answer_pii = redact_pii(answer)
+    record_event(
+        trace_id=trace_id,
+        event_type="final_answer",
+        agent=agent_name,
+        detail={
+            "answer": redacted_answer,
+            "pii_detected": answer_pii,
+        },
+    )
+
+    return answer
 
 
 if __name__ == "__main__":
