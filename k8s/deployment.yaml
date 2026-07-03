@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: enterprise-agentic-platform
+  labels:
+    app: enterprise-agentic-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: enterprise-agentic-platform
+  template:
+    metadata:
+      labels:
+        app: enterprise-agentic-platform
+    spec:
+      containers:
+        - name: platform
+          image: enterprise-agentic-platform:v1
+          imagePullPolicy: Never  # use the local image we just built
+          envFrom:
+            - secretRef:
+                name: platform-secrets
