@@ -28,7 +28,7 @@ async def stream_mcp_agent(
     user_question: str,
     system_prompt: str | None,
     trace_id: str,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[dict, None]:
     """Yield answer text chunks as they're generated."""
     server_params = StdioServerParameters(
         command="python", args=["-m", server_module], env=os.environ.copy()
@@ -72,7 +72,7 @@ async def stream_mcp_agent(
                     last_error = e
                     logger.warning("groq_call_failed_retrying", attempt=attempt + 1, error=str(e))
             if choice is None:
-                yield "Sorry, something went wrong reaching the model."
+                yield {"type": "chunk", "text": "Sorry, something went wrong reaching the model."}
                 return
 
             if choice.tool_calls:
@@ -88,12 +88,15 @@ async def stream_mcp_agent(
                 for call in choice.tool_calls:
                     args = json.loads(call.function.arguments)
                     logger.info("agent_calling_tool", server=server_module, tool=call.function.name, args=args)
+                    yield {"type": "tool_call", "tool": call.function.name, "args": args}
                     try:
                         check_tool_call(call.function.name, args, trace_id)
                         result = await session.call_tool(call.function.name, args)
                         result_text = result.content[0].text if result.content else ""
+                        yield {"type": "tool_result", "tool": call.function.name}
                     except GuardrailViolation as e:
                         result_text = f"BLOCKED BY GOVERNANCE POLICY: {e}"
+                        yield {"type": "tool_blocked", "tool": call.function.name}
                     messages.append({"role": "tool", "tool_call_id": call.id, "content": result_text})
 
                 stream = groq_client.chat.completions.create(
@@ -104,7 +107,7 @@ async def stream_mcp_agent(
                 for chunk in stream:
                     delta = chunk.choices[0].delta.content
                     if delta:
-                        yield delta
+                        yield {"type": "chunk", "text": delta}
             else:
                 if choice.content:
-                    yield choice.content
+                    yield {"type": "chunk", "text": choice.content}

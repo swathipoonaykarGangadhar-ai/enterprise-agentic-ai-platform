@@ -89,9 +89,12 @@ async def ask_stream(request: AskRequest):
 
     async def event_stream():
         full_answer = ""
-        async for chunk in stream_mcp_agent(server_module, question, system_prompt, trace_id):
-            full_answer += chunk
-            yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        yield f"data: {json.dumps({'type': 'routing', 'agent': agent_name})}\n\n"
+
+        async for event in stream_mcp_agent(server_module, question, system_prompt, trace_id):
+            if event["type"] == "chunk":
+                full_answer += event["text"]
+            yield f"data: {json.dumps(event)}\n\n"
 
         redacted_answer, answer_pii = redact_pii(full_answer)
         record_event(
@@ -100,7 +103,7 @@ async def ask_stream(request: AskRequest):
             agent=agent_name,
             detail={"answer": redacted_answer, "pii_detected": answer_pii},
         )
-        yield f"data: {json.dumps({'done': True})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
