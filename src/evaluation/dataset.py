@@ -16,7 +16,7 @@ EVAL_CASES = [
         "id": "vacation_policy_rephrased",
         "question": "How many days off do I get annually?",
         "expected_route": "knowledge",
-        "expected_facts": ["15", "PTO"],
+        "expected_facts": ["15 days", "accrue"],
     },
     {
         "id": "onboarding_basic",

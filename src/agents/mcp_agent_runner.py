@@ -76,7 +76,7 @@ async def run_mcp_agent(
 
             choice = None
             last_error = None
-            for attempt in range(3):
+            for attempt in range(5):
                 try:
                     response = groq_client.chat.completions.create(
                         model=settings.groq_model,
